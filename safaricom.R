@@ -62,16 +62,23 @@ MACD <- MACD(safaricom_returns)
 
 RSI <- RSI(safaricom_returns)
 
-#ADX
+# ADX
 ADX <- ADX( safaricom2[,1:4] )
 
-#BBANDS
+# BBANDS
 bband <- BBands(safaricom_returns)
 
-#Stochastic Oscillator 
+# Stochastic Oscillator 
 sc <- stoch(safaricom_returns)
 
-saf_var <- data.frame(safaricom_returns, MACD, RSI, ADX, bband, sc)
+# Average True Range
+ATR <- ATR(safaricom2[,1:4])
+
+# Commodity Channel Index
+CCI <- CCI(safaricom_returns)
+
+# Rate of Change
+ROC <- ROC(safaricom_returns) 
 
 # Returns -----------------------------------------------------------------
 
@@ -83,6 +90,9 @@ safaricom_returns <- safaricom_returns %>%
 safaricom_returns$Direction <- case_when(as.numeric(safaricom_returns$Return) < 0 ~ "Down", 
                           as.numeric(safaricom_returns$Return) >0 ~ "Up", 
                           .default = "Down")
+saf_var <- data.frame(MACD, RSI, ADX, bband, sc, ATR, CCI, ROC, 
+                      row.names = row.names(safaricom_returns),
+                      "Direction" = safaricom_returns$Direction)
  
 returns_data <- safaricom_returns %>% 
   na.omit() %>% 
@@ -113,13 +123,8 @@ safaricom2 %>%
 
 # Feature Engineering -----------------------------------------------------
 
-saf_var$macd_indicator <- ifelse(saf_var$macd < saf_var$signal, "bearish", "bullish")
+#saf_var$macd_indicator <- ifelse(saf_var$macd < saf_var$signal, "bearish", "bullish")
 glimpse(saf_var)
-
-saf_var <- saf_var %>% 
-  select(rsi, DIp, DIn, ADX, pctB, slowD, macd_indicator) %>% 
-  mutate(Direction = safaricom_returns$Direction) %>% 
-  na.omit()
 
 
 # leading Directions -----------------------------------------------------
@@ -159,14 +164,7 @@ caret::confusionMatrix(train_data$Direction, predict_label_train)
 
 # Trying ------------------------------------------------------------------
 
-test_saf_var <- data.frame(saf_var[, 2:ncol(saf_var)], "Direction" = safaricom_returns$Direction)
-
-test_saf_var$Direction <- lead(test_saf_var$Direction)
-  
-test_saf_var <- test_saf_var %>%
-  na.omit() %>%
-  as.data.frame() %>%
-  `row.names<-`(NULL)
+test_saf_var <- saf_var
 
 # splitting
 size <- 0.8
@@ -183,12 +181,12 @@ summary(MODEL)
 step_model <- step(MODEL, direction = "both")
 
 train_data3 <- train_data2 %>%
-  select(macd, signal, rsi, DIn, mavg,DX, fastK, fastD, Direction) # 
+  select(DIn, mavg,trueHigh, Close, Direction) # 
 
 test_data3 <- test_data2 %>%
   select(macd, signal, rsi, DIn, mavg, fastK,DX, fastD, Direction)
 
-MODEL2 <- glm(factor(Direction) ~., train_data3, family = binomial())
+MODEL2 <- glm((Direction) ~., train_data3, family = binomial())
 summary(MODEL2)
 
 
@@ -204,15 +202,44 @@ caret::confusionMatrix(train_data$Direction, predict_label_train)
 
 
 # Random Forest
-random_model <- randomForest(x = train_data3[, 1:8], y = factor(train_data3$Direction), ntree = 400)
-predict_forest <- predict(random_model, new.data = train_data3)
+random_model <- randomForest(x = train_data[, 1:20], y = factor(train_data$Direction), ntree = 600)
+predict_forest <- predict(random_model, new.data = train_data)
 caret::confusionMatrix(train_data$Direction, predict_forest)
 
-predict_forest_test <- predict(random_model, newdata = test_data3)
+predict_forest_test <- predict(random_model, newdata = test_data)
 caret::confusionMatrix(test_data$Direction, predict_forest_test)
 
 
 
+# Function for ntree highest accuracy -------------------------------------
+
+n_tree <- function(train_data) {
+  n <- 400
+  acc <- rep(0, length(n))
+  for (i in seq_along(n)) 
+    {
+    paste0(message("Hey, I am now fitting model: ", i))
+    random_model <- randomForest(
+      x = train_data[, 1:20],
+      y = factor(train_data$Direction),
+      ntree = n[i],
+      importance = TRUE,
+      proximity = TRUE
+    )
+    # Calculate accuracy of the model on the training data
+    paste0(message("Hey, still there? I am now calculating the accuracy for  model: ", i))
+    pred <- predict(random_model, newdata = train_data)
+    acc[i] <- mean(pred == train_data$Direction)
+  }
+  # Find the number of trees that yields the highest accuracy
+  message("Finally finished! These are the results: ")
+  max_acc_idx <- which.max(acc)
+  n_trees <- n[max_acc_idx]
+  return(n_trees)
+}
+
+n_tree(train_data)
+# Funny enough 400 has the highest accuracy
 
 
 
