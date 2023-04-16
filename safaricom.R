@@ -204,11 +204,12 @@ caret::confusionMatrix(train_data$Direction, predict_label_train)
 
 
 # Random Forest
-random_model <- randomForest(x = train_data3[, 1:8], y = factor(train_data3$Direction), ntree = 10000)
+random_model <- randomForest(x = train_data3[, 1:8], y = factor(train_data3$Direction), ntree = 400)
+predict_forest <- predict(random_model, new.data = train_data3)
+caret::confusionMatrix(train_data$Direction, predict_forest)
 
-
-
-
+predict_forest_test <- predict(random_model, newdata = test_data3)
+caret::confusionMatrix(test_data$Direction, predict_forest_test)
 
 
 
