@@ -11,8 +11,7 @@ safaricom <- read_excel("stock_prices.xlsx") %>%
   mutate(Date = ymd(Date))
 
 id <- safaricom$Date
-
-safaricom2 <- safaricom %>% 
+safaricom <- safaricom %>% 
   select(-Date) %>% 
   xts(order.by = ymd(id))
 
@@ -20,12 +19,9 @@ head(safaricom)
 
 # Descriptive ------------------------------------------------------------
 
-data.frame(
-  mean = format(sapply(safaricom[,2:ncol(safaricom)], mean), scientific = FALSE), 
-  variance = format(sapply(safaricom[,2:ncol(safaricom)], var), scientific = TRUE),
-  skewness = sapply(safaricom[,2:ncol(safaricom)], skewness),
-  kurtosis = sapply(safaricom[,2:ncol(safaricom)], kurtosis)
-)
+table.Arbitrary(Cl(safaricom) |> CalculateReturns() |> na.omit(), 
+                metrics = c('mean', 'sd', 'skewness', 'kurtosis'),
+                metricsNames = c('mean', 'sd', 'skewness', 'kurtosis'))
 
 # convert data to long format ---------------------------------------------
 
@@ -39,21 +35,26 @@ safaricom_long <- pivot_longer(
 
 # Plotting ----------------------------------------------------------------
 
-safaricom_long %>% 
-  ggplot(aes(x  = Date)) +
-  geom_line(aes(y = price, col = stock), linewidth = .7) +
-  facet_wrap(~stock, ncol = 2) +
-theme_minimal() +
-  theme(axis.line = element_line(colour = "black"),
-        axis.ticks = element_line(colour = "black", size = 1),
-        axis.text = element_text(colour = "black"),
-        plot.title = element_text(colour = "black", hjust = .5)) +
-  guides(col = "none") +
-  labs(title = "SCOM Stock Prices")
+OHLC(safaricom) %>%
+  tail(n = 60) %>% 
+  dygraph() %>%
+  dyCandlestick()
+
+# safaricom_long %>% 
+#   ggplot(aes(x  = Date)) +
+#   geom_line(aes(y = price, col = stock), linewidth = .7) +
+#   facet_wrap(~stock, ncol = 2) +
+# theme_minimal() +
+#   theme(axis.line = element_line(colour = "black"),
+#         axis.ticks = element_line(colour = "black", size = 1),
+#         axis.text = element_text(colour = "black"),
+#         plot.title = element_text(colour = "black", hjust = .5)) +
+#   guides(col = "none") +
+#   labs(title = "SCOM Stock Prices")
 
 # Technical Indicators ---------------------------------------------------------------
 
-safaricom_returns <- safaricom2$Close
+safaricom_returns <- safaricom$Close
 
 #MACD
 MACD <- MACD(safaricom_returns)
@@ -63,7 +64,7 @@ MACD <- MACD(safaricom_returns)
 RSI <- RSI(safaricom_returns)
 
 # ADX
-ADX <- ADX( safaricom2[,1:4] )
+ADX <- ADX( safaricom[,1:4] )
 
 # BBANDS
 bband <- BBands(safaricom_returns)
@@ -72,7 +73,7 @@ bband <- BBands(safaricom_returns)
 sc <- stoch(safaricom_returns)
 
 # Average True Range
-ATR <- ATR(safaricom2[,1:4])
+ATR <- ATR(safaricom[,1:4])
 
 # Commodity Channel Index
 CCI <- CCI(safaricom_returns)
@@ -114,7 +115,7 @@ return_plot
 
 # Plotting the direction using candlesticks
 
-safaricom2 %>%
+safaricom %>%
   as.data.frame() %>% 
   select(-c(Volume)) %>% 
   tail(n = 60) %>% 
