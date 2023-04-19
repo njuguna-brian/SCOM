@@ -3,7 +3,7 @@
 
 library(pacman)
 p_load(dplyr, tidyr, readxl, quantmod, ModelMetrics, randomForest, rpart ,rpart.plot, 
-       xts, lubridate, TTR, PerformanceAnalytics, ggplot2, dygraphs)
+       xts, lubridate, TTR, PerformanceAnalytics, ggplot2, dygraphs, xgboost, tseries)
 
 # Importing data ----------------------------------------------------------
 
@@ -77,15 +77,6 @@ ATR <- ATR(safaricom2[,1:4])
 # Commodity Channel Index
 CCI <- CCI(safaricom_returns)
 
-# Rate of Change
-ROC <- ROC(safaricom_returns) 
-
-# Money Flow Index (MFI)
-MFI <- MFI(safaricom_returns, volume = safaricom2$Volume)
-
-# On-Balance Volume (OBV)
-OBV <- OBV(safaricom_returns, volume = safaricom2$Volume)
-
 # Returns -----------------------------------------------------------------
 
 safaricom_returns$Return <- CalculateReturns(safaricom_returns)
@@ -97,8 +88,8 @@ safaricom_returns <- safaricom_returns %>%
 safaricom_returns$Direction <- case_when(as.numeric(safaricom_returns$Return) < 0 ~ "Down", 
                           as.numeric(safaricom_returns$Return) >0 ~ "Up", 
                           .default = "Down")
-saf_var <- data.frame(MACD, RSI, ADX, bband, sc, ATR, CCI, ROC,
-                      MFI, OBV,
+saf_var <- data.frame("MACD" = MACD$macd, RSI, "ADX" = ADX$ADX, "middleband" = bband$mavg,
+                      "fastD" = sc$fastD, "ATR" = ATR$atr, "CCI" = CCI$cci,
                       row.names = row.names(safaricom_returns),
                       "Direction" = safaricom_returns$Direction)
  
@@ -134,7 +125,6 @@ safaricom2 %>%
 #saf_var$macd_indicator <- ifelse(saf_var$macd < saf_var$signal, "bearish", "bullish")
 glimpse(saf_var)
 
-
 # leading Directions -----------------------------------------------------
 
 saf_var$Direction <- lead(saf_var$Direction)  
@@ -169,97 +159,58 @@ predict_label <- ifelse(predict_data < 0.5, "Down", "Up") %>%
 caret::confusionMatrix(test_data$Direction, predict_label)
 caret::confusionMatrix(train_data$Direction, predict_label_train)
 
-
-# Trying ------------------------------------------------------------------
-
-test_saf_var <- saf_var
-
-# splitting
-size <- 0.8
-sample_size2 <- floor(size * nrow(test_saf_var))
-set.seed(123)
-indicies2 <- sample(seq_len(nrow(test_saf_var)), size = sample_size2)
-train_data2 <- test_saf_var[indicies2,]
-test_data2 <- test_saf_var[-indicies2,]
-
-
-
-MODEL <- glm(factor(Direction) ~., train_data2, family = binomial())
-summary(MODEL)
-step_model <- step(MODEL, direction = "both")
-
-train_data3 <- train_data %>%
-  select(rsi, mavg, atr, trueHigh, Close, mfi, obv, Direction) # 
-
-test_data3 <- test_data %>%
-  select(rsi, mavg, atr, trueHigh, Close, mfi, obv, Direction)
-
-MODEL2 <- glm((Direction) ~., train_data3, family = binomial())
-summary(MODEL2)
-
-
-predict_train2 <- predict(MODEL2, train_data3, type = "response")
-predict_label_train2 <- ifelse(predict_train2 < 0.5, "Down", "Up") %>% 
-  as.factor()
-predict_data2 <- predict(MODEL2, test_data3, type= "response")
-
-predict_label2 <- ifelse(predict_data2 < 0.5, "Down", "Up") %>% 
-  as.factor()
-caret::confusionMatrix(factor(test_data2$Direction), predict_label2)
-caret::confusionMatrix(train_data$Direction, predict_label_train)
-
-
-# Random Forest
-size <- 0.8
-sample_size <- floor(size * nrow(test_saf_var))
-set.seed(123)
-indicies <- sample(seq_len(nrow(test_saf_var)), size = sample_size)
-train_data <- test_saf_var[indicies,]
-test_data <- test_saf_var[-indicies,]
-
-
-
-
+# Random Forest -----------------------------------------------------------
 
 set.seed(845)
-random_model <- randomForest(x = train_data[, 1:22], y = (train_data$Direction), ntree = 10000)
+random_model <- randomForest(x = train_data[, 1:7], y = (train_data$Direction), ntree = 400)
 predict_forest <- predict(random_model, new.data = train_data)
 caret::confusionMatrix(train_data$Direction, predict_forest)
 
 predict_forest_test <- predict(random_model, newdata = test_data)
 caret::confusionMatrix(test_data$Direction, predict_forest_test)
 
+# 1. XGBOOST --------------------------------------------------------------
 
+train_data$Direction <- ifelse(train_data$Direction == "Up", 1, 0)
+test_data$Direction <- ifelse(test_data$Direction == "Up", 1, 0)
+y_train = train_data$Direction
+y_test = test_data$Direction
 
-# Function for ntree highest accuracy -------------------------------------
+xgb_train = xgb.DMatrix(as.matrix(train_data[,1:7]), label = y_train)
+xgb_test = xgb.DMatrix(as.matrix(test_data[,1:7]), label = y_test)
+xgb_params <- list(
+  booster = "gbtree",
+  eta = 0.01,
+  max_depth = 10,
+  gamma = 4,
+  subsample = 0.75,
+  colsample_bytree = 1,
+  eval_metric = "auc",
+  objective = "binary:logistic"
+)
 
-n_tree <- function(train_data) {
-  n <- 400
-  acc <- rep(0, length(n))
-  for (i in seq_along(n)) 
-    {
-    paste0(message("Hey, I am now fitting model: ", i))
-    random_model <- randomForest(
-      x = train_data[, 1:20],
-      y = factor(train_data$Direction),
-      ntree = n[i],
-      importance = TRUE,
-      proximity = TRUE
-    )
-    # Calculate accuracy of the model on the training data
-    paste0(message("Hey, still there? I am now calculating the accuracy for  model: ", i))
-    pred <- predict(random_model, newdata = train_data)
-    acc[i] <- mean(pred == train_data$Direction)
-  }
-  # Find the number of trees that yields the highest accuracy
-  message("Finally finished! These are the results: ")
-  max_acc_idx <- which.max(acc)
-  n_trees <- n[max_acc_idx]
-  return(n_trees)
-}
+xgb_model <- xgb.train(
+  params = xgb_params,
+  data = xgb_train,
+  nrounds = 100,
+  verbose = 1
+)
 
-n_tree(train_data)
-# Funny enough 400 has the highest accuracy
+test_data$Direction <- ifelse(test_data$Direction == 1, "Up", "Down") %>% 
+  as.factor()
+
+train_data$Direction <- ifelse(train_data$Direction == 1, "Up", "Down") %>% 
+  as.factor()
+
+xgb_preds_train <- predict(xgb_model, xgb_train, type = "response")
+xgb_preds_train <- ifelse(xgb_preds_train <0.48, "Down", "Up") %>% 
+  as.factor()
+caret::confusionMatrix(train_data$Direction, xgb_preds_train)
+
+xgb_preds <- predict(xgb_model, xgb_test, type = "response")
+xgb_preds <- ifelse(xgb_preds <0.5, "Down", "Up") %>% 
+  as.factor()
+caret::confusionMatrix(test_data$Direction, xgb_preds)
 
 
 

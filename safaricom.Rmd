@@ -11,7 +11,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, fig.keep = 'last', warning = FALSE, message = FALSE, cache = FALSE,  comment = NA)
 options(digits = 5)
-source("Safaricom.R")
+source("SCOM.R")
 ```
 
 # Introduction
@@ -98,9 +98,9 @@ For this study, the closing price was selected for modelling. The plot below sho
 return_plot
 ```
 
-## Feature Engineering
+# Feature Engineering
 
-### The Dependent Variable
+## The Dependent Variable
 
 The dependent variable utilized in this study was the directional movement of stock returns. Specifically, if the returns of a given day were negative, this was denoted as "Down", while if the returns were positive, this was recorded as "Up". However, in instances where the returns were exactly equal to zero, these were also classified as "Down" for the sake of simplicity.
 
@@ -108,11 +108,18 @@ To provide further clarification, the designation of "Up" for positive returns i
 
 ![](CANDLE.png)
 
-# The Independent Variables.
+The directional dependent variable in the data was shifted forward by one day, which means that the direction value for each day now indicates the direction of the return movement for the following day.
+
+For example, suppose the original Direction value for Day 1 was "Up". By shifting the Direction column forward by one day, the "Up" direction value for Day 1 now corresponds to the returns movement for Day 2.
+
+So, the Direction column is now indicating the stock price movement for each day, based on the direction value for the following day. This shift was made to align the Direction values with the returns movements, making it easier to analyze and interpret the data.
+
+
+## The Independent Variables.
 
 The following **technical indicators** were used as the independent variables.
 
-## Moving Average Convergence Divergence (MACD)
+### Moving Average Convergence Divergence (MACD)
 
 The MACD is a trend-following momentum indicator that shows the relationship between two exponential moving averages. It is calculated by subtracting the 26-period Exponential Moving Average from the 12-period Exponential Moving Average.
 
@@ -120,13 +127,13 @@ When the Moving Average Convergence Divergence (MACD) line crosses from below to
 
 ![](MACD.png)
 
-## Relative Strength Index (RSI)
+### Relative Strength Index (RSI)
 
 The RSI is a momentum oscillator that measures the strength and speed of a stock's price movements. It ranges from 0 to 100 and is calculated based on the average gains and losses over a specific time period. In simpler terms, it is used to measure the strength of stock price actions. It is calculated as the Ratio of Upward movement to Downward price movement over specified period of time.
 
 ![](RSI.png)
 
-## Average Directional Index (ADX)
+### Average Directional Index (ADX)
 
 The ADX indicator measures the strength of the trend in the stock prices. It's calculation results from;
 
@@ -140,7 +147,7 @@ The ADX indicator is calculated as the moving average of DX.
 
 ![](ADX.png)
 
-## Bollinger Bands
+### Bollinger Bands
 
 Bollinger Bands represent a commonly used indicator that closely monitors volatility. This dynamic indicator features three distinct lines, with a moving average placed in the middle and an upper and lower band situated at two standard deviations from the moving average. The bands are designed to track fluctuations in the stock price and provide valuable insights into whether the stock is overbought or oversold. Specifically, Bollinger Bands are useful for identifying times when a stock is performing outside of its normal range. When the stock price climbs above the upper band, it indicates that it is overbought and may be due for a pullback.
 
@@ -150,7 +157,7 @@ Also from the bollinger bands, there is the **percent Bandwidth**. It is calcula
 
 ![](PB.png)
 
-## Stochastic Oscillator
+### Stochastic Oscillator
 
 The stochastic oscillator is a tool that helps investors understand how a stock's price compares to its price range over a certain period of time. It measures momentum and can help identify when a stock is overbought or oversold. There are three key indicators:
 
@@ -162,7 +169,108 @@ The stochastic oscillator is a tool that helps investors understand how a stock'
 
 Values above 80 indicate an overbought condition, while values below 20 indicate an oversold condition.
 
+### Average True Range (ATR)
+
+Average True Range is a technical indicator commonly used in financial markets to measure the volatility of an asset. ATR is calculated using a formula that takes into account the price range of an asset over a specified period of time, and provides a measure of the average movement of the asset's price on a day-to-day basis.
+
+![](E:/Desktop/safcom/ATR.png)
+
+### Commodity Channel Index (CCI)
+
+Commodity Channel Index (CCI) is a technical indicator used to identify cyclical trends in securities. It is often used to identify overbought and oversold levels. The CCI measures the difference between the current price of a security and its average price over a given period of time, adjusted for normal deviations in price. The indicator oscillates above and below zero. A positive value suggests that the price is above the average, while a negative value suggests that the price is below the average.
+
+![](E:/Desktop/safcom/CCI.png)
+
 
 Thus, the selected independent variables were;
 
-1.  
+1. Moving Average Convergence Divergence (MACD) 
+
+2. Relative Strength Index (RSI)
+
+3. Average Directional Index (ADX)
+
+4. The moving average also known as the middle band from the Bollinger Bands
+
+5. The short term trading strategies represented by *fastD* which is the moving average of the *fastK* in the stochastic oscillator indicator
+
+6. The Average True Value (ATR)
+
+7. Commodity Channel Index (CCI) 
+
+# Methodology
+
+## The Machine Learning Algorithm
+
+The machine learning algorithm used to predict the returns movements was the **Extreme Gradient Boosting** machine learning algorithm (XGBoost). XGBoost is a variant of the **gradient boosting** algorithm that is designed to be faster and more efficient. It is one of the most widely used algorithms for winning machine learning competitions on platforms such as *Kaggle*.
+
+The XGBoost algorithm works by building a series of decision trees, where each tree tries to correct the errors of the previous tree. During the training process, the algorithm calculates the gradient and the Hessian of the loss function for each instance, which provides information about the direction and curvature of the error surface. The algorithm then uses these values to determine the best split at each node of the decision tree.
+
+## Data Splitting
+
+After performing feature engineering, the dataset consisted of 3,689 rows and 8 variables (columns), which includes the dependent variable. To train the model, 70% of the data was used, while the remaining 30% was reserved for testing and prediction.
+
+# Results
+
+After training the model, the results of the model were;
+
+```{r}
+print(xgb_model)
+```
+The *params* section explains the parameters used in the model which are as explained below;
+
+booster = "gbtree": This parameter specifies that the gradient boosting algorithm should use a decision tree as the base learner.
+
+1. *eta = 0.01*: This is the learning rate, which controls the step size at each iteration of the boosting algorithm. A smaller learning rate generally results in a more accurate model, but requires more iterations to converge.
+
+2. *max_depth = 8*: This parameter sets the maximum depth of the decision trees used in the boosting algorithm. A larger value can result in a more complex model, but may also increase the risk of overfitting.
+
+3. *gamma = 4*: This parameter specifies the minimum reduction in the loss function required to split a leaf node. A larger value can help prevent overfitting by only splitting nodes that lead to a significant improvement in the model.
+
+4. *subsample = 0.75*: This parameter specifies the fraction of the data that should be randomly sampled for each tree in the boosting algorithm. A smaller value can help prevent overfitting by introducing more randomness into the model.
+
+5. *colsample_bytree = 1*: This parameter specifies the fraction of features that should be randomly sampled for each tree in the boosting algorithm. A smaller value can help prevent overfitting by introducing more randomness into the model.
+
+6. *eval_metric = "auc"*: This parameter specifies the evaluation metric to be used during training. In this case, "auc" stands for Area Under the ROC Curve, which is a common metric used for binary classification problems.
+
+7. *objective = "binary:logistic"*: This parameter specifies the loss function to be used during training. In this case, "binary:logistic" indicates that the algorithm should use logistic regression for binary classification.
+
+The following confusion matrix was obtained in predicting the training data;
+
+```{r}
+caret::confusionMatrix(train_data$Direction, xgb_preds_train)
+```
+
+The XGBoost model attained an accuracy of 1 in predicting the training data. The following confusion matrix was obtained in predicting the test data
+
+```{r}
+caret::confusionMatrix(test_data$Direction, xgb_preds)
+```
+
+The accuracy on the testing data was also 1. The matrix shows the number of true positives (TP), false positives (FP), false negatives (FN), and true negatives (TN) that resulted from the model's predictions. In this case, the model predicted "Down" 432 times and "Up" 306 times, with no false positives or false negatives.
+
+The accuracy of the model is 1.0, meaning it correctly predicted all of the samples. The 95% confidence interval for the accuracy ranges from 0.995 to 1.0, indicating that the model is highly reliable.
+
+The no information rate (NIR) is 0.585, which represents the accuracy that could be achieved by always predicting the most common class. Since the model's accuracy is much higher than the NIR, it shows that the model is performing well.
+
+The kappa statistic measures the agreement between the model's predictions and the true labels, with a maximum value of 1.0 indicating perfect agreement. In this case, the kappa statistic is also 1.0, indicating perfect agreement between the predictions and true labels.
+
+The sensitivity and specificity of the model are both 1.0, meaning it correctly identified all of the positive and negative samples. The positive predictive value (PPV) and negative predictive value (NPV) are also both 1.0, indicating that the model's positive and negative predictions were always correct.
+
+The prevalence of the positive class is 0.585, which is the proportion of samples in the dataset that belong to the positive class. The detection rate and detection prevalence are also both 0.585, indicating that the model correctly identified all of the positive samples.
+
+Finally, the balanced accuracy of the model is 1.0, which is the average of the sensitivity and specificity. This value takes into account the fact that the classes may be imbalanced, and it indicates that the model is performing well for both classes.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
