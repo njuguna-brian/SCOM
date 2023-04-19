@@ -181,7 +181,7 @@ xgb_test = xgb.DMatrix(as.matrix(test_data[,1:7]), label = y_test)
 xgb_params <- list(
   booster = "gbtree",
   eta = 0.01,
-  max_depth = 10,
+  max_depth = 5,
   gamma = 4,
   subsample = 0.75,
   colsample_bytree = 1,
@@ -208,7 +208,7 @@ xgb_preds_train <- ifelse(xgb_preds_train <0.48, "Down", "Up") %>%
 caret::confusionMatrix(train_data$Direction, xgb_preds_train)
 
 xgb_preds <- predict(xgb_model, xgb_test, type = "response")
-xgb_preds <- ifelse(xgb_preds <0.5, "Down", "Up") %>% 
+xgb_preds <- ifelse(xgb_preds <0.48, "Down", "Up") %>% 
   as.factor()
 caret::confusionMatrix(test_data$Direction, xgb_preds)
 
