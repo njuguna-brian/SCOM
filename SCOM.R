@@ -133,7 +133,7 @@ saf_var <- saf_var %>%
   na.omit() %>% 
   data.frame() %>% 
   `row.names<-`(NULL)
-
+write.csv(saf_var, 'E:/Desktop/safcom/saf_var.csv', row.names = FALSE)
 # Splitting the data ------------------------------------------------------
 
 size <- 0.8
@@ -174,14 +174,16 @@ caret::confusionMatrix(test_data$Direction, predict_forest_test)
 train_data$Direction <- ifelse(train_data$Direction == "Up", 1, 0)
 test_data$Direction <- ifelse(test_data$Direction == "Up", 1, 0)
 y_train = train_data$Direction
-y_test = test_data$Direction
+
+
+test_labels = 1:nrow(test_data)
 
 xgb_train = xgb.DMatrix(as.matrix(train_data[,1:7]), label = y_train)
-xgb_test = xgb.DMatrix(as.matrix(test_data[,1:7]), label = y_test)
+xgb_test = xgb.DMatrix(as.matrix(test_data[,1:7]))
 xgb_params <- list(
   booster = "gbtree",
   eta = 0.01,
-  max_depth = 5,
+  max_depth = 8,
   gamma = 4,
   subsample = 0.75,
   colsample_bytree = 1,
@@ -192,7 +194,7 @@ xgb_params <- list(
 xgb_model <- xgb.train(
   params = xgb_params,
   data = xgb_train,
-  nrounds = 100,
+  nrounds = 5000,
   verbose = 1
 )
 
@@ -203,12 +205,12 @@ train_data$Direction <- ifelse(train_data$Direction == 1, "Up", "Down") %>%
   as.factor()
 
 xgb_preds_train <- predict(xgb_model, xgb_train, type = "response")
-xgb_preds_train <- ifelse(xgb_preds_train <0.48, "Down", "Up") %>% 
+xgb_preds_train <- ifelse(xgb_preds_train <0.96, "Down", "Up") %>% 
   as.factor()
 caret::confusionMatrix(train_data$Direction, xgb_preds_train)
 
 xgb_preds <- predict(xgb_model, xgb_test, type = "response")
-xgb_preds <- ifelse(xgb_preds <0.48, "Down", "Up") %>% 
+xgb_preds <- ifelse(xgb_preds <0.4, "Down", "Up") %>% 
   as.factor()
 caret::confusionMatrix(test_data$Direction, xgb_preds)
 

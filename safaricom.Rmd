@@ -11,8 +11,12 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, fig.keep = 'last', warning = FALSE, message = FALSE, cache = FALSE,  comment = NA)
 options(digits = 5)
-source("SCOM.R")
+source("safaricom_final.R")
 ```
+
+\newpage
+\tableofcontents
+\newpage
 
 # Introduction
 
@@ -91,12 +95,6 @@ theme_minimal() +
 ```
 
 Based on the time series plot, it appears that there was a discernible upward trend in the stock prices until approximately 2021, after which point the prices began to decrease. This suggests that some significant event or factor may have had an impact on investor sentiment, leading to a decline in demand for the stock. However, without further information about the specific stock, its industry, and the broader economic and political context in which it operates, it is difficult to draw definitive conclusions regarding the underlying causes of this trend. A more comprehensive analysis is necessary to fully understand the dynamics at play.
-
-For this study, the closing price was selected for modelling. The plot below shows the time series plot of the stock returns
-
-```{r, fig.width=7}
-return_plot
-```
 
 # Feature Engineering
 
@@ -182,6 +180,19 @@ Commodity Channel Index (CCI) is a technical indicator used to identify cyclical
 ![](E:/Desktop/safcom/CCI.png)
 
 
+## Rolling Closing Price 
+
+This variable was created by taking the rolling standard deviation of the closing price (Cl) over a window of 10 periods. This means that it captures the volatility of the stock over the past 10 periods, as measured by the standard deviation of the price movements. The rolling standard deviation is used instead of the standard deviation of the entire dataset to provide a more current estimate of volatility that takes into account recent price movements. By including this variable in the analysis, we can better understand how the volatility of the stock is related to its returns movement.
+
+## Signal-to-Noise Ratio of the High-Low-Close
+
+The SNR is a measure of the strength of the signal (the trend of the price movements) relative to the noise (the random fluctuations in the price). A higher SNR indicates a stronger trend in the price movements.
+
+## The Volume Weighted Average Price (VWAP)
+
+The Volume Weighted Average Price (VWAP) was calculated and used as one of the independent variables in the analysis. VWAP is a measure of the average price at which a stock has traded throughout the day, weighted by the volume of shares traded at each price. It provides insight into whether a stock is being bought or sold at a good price and is often used by institutional investors to make trading decisions. The VWAP was calculated using a 5-period window and was included in the analysis as an independent variable.
+
+
 Thus, the selected independent variables were;
 
 1. Moving Average Convergence Divergence (MACD) 
@@ -190,86 +201,147 @@ Thus, the selected independent variables were;
 
 3. Average Directional Index (ADX)
 
-4. The moving average also known as the middle band from the Bollinger Bands
+4. The percent Bandwidth from the Bollinger Bands
 
-5. The short term trading strategies represented by *fastD* which is the moving average of the *fastK* in the stochastic oscillator indicator
+5. *fastK*^[In the stochastic oscillator, fastK is the first line of the stochastic calculation, which represents the current closing price relative to the recent range of prices. It is typically calculated over a period of time, such as 14 days, and is used to determine the momentum of the stock or asset being analyzed.] from the Stochastic Oscillator. 
 
 6. The Average True Value (ATR)
 
 7. Commodity Channel Index (CCI) 
 
+8. Signal-to-Noise Ratio
+
+9. The Volume Weighted Average Price
+
+10. Rolling standard deviation of the closing price (Cl) over a window of 10 periods ^[named as VOL in the data set]. The complete data set was as follows;
+
+```{r}
+
+kableExtra::kable(head(df), row.names = FALSE)
+
+```
+
+
+
 # Methodology
 
 ## The Machine Learning Algorithm
 
-The machine learning algorithm used to predict the returns movements was the **Extreme Gradient Boosting** machine learning algorithm (XGBoost). XGBoost is a variant of the **gradient boosting** algorithm that is designed to be faster and more efficient. It is one of the most widely used algorithms for winning machine learning competitions on platforms such as *Kaggle*.
+In this study, three machine learning algorithms were used to predict the movement of SCOM stock returns: Random Forest, Lasso Regression, and Ridge Regression.
 
-The XGBoost algorithm works by building a series of decision trees, where each tree tries to correct the errors of the previous tree. During the training process, the algorithm calculates the gradient and the Hessian of the loss function for each instance, which provides information about the direction and curvature of the error surface. The algorithm then uses these values to determine the best split at each node of the decision tree.
+Random Forest is a powerful ensemble learning method that builds multiple decision trees based on a random subset of the predictors and observations, and aggregates their predictions to improve accuracy and reduce overfitting. Random Forest is known for its ability to handle complex interactions and nonlinearities in the data, making it a good choice for this study where technical indicators were used as predictors.
+
+Lasso Regression and Ridge Regression are both linear regression techniques that use regularization to control the complexity of the model and prevent overfitting. Lasso Regression performs L1 regularization, which shrinks the coefficients of less important predictors to zero, effectively selecting a subset of the most relevant predictors. Ridge Regression performs L2 regularization, which penalizes large coefficients and encourages small, smooth coefficients. Both techniques are commonly used in feature selection and variable importance analysis.
+
+The selection of these three models was likely based on their strengths and suitability for the task at hand. Random Forest was chosen for its ability to handle complex data and interactions, while Lasso and Ridge Regression were chosen for their ability to perform variable selection and regularization. By using three different models, the study was able to compare and validate the results, and choose the best model based on accuracy and other performance metrics.
 
 ## Data Splitting
 
 After performing feature engineering, the dataset consisted of 3,689 rows and 8 variables (columns), which includes the dependent variable. To train the model, 70% of the data was used, while the remaining 30% was reserved for testing and prediction.
 
-# Results
+# Data Analysis and Results.
 
-After training the model, the results of the model were;
+Before training the model, centering and scaling were applied to the technical indicators to bring them to a common scale. This is important because some of the technical indicators could have been measured on different scales, which could lead to some variables having a higher influence on the model than others. By centering and scaling the variables, they are transformed to have a mean of 0 and a standard deviation of 1, which ensures that all variables have the same weight in the model.
 
-```{r}
-print(xgb_model)
-```
-The *params* section explains the parameters used in the model which are as explained below;
+Additionally, the Yeohjon's method was used to transform the variables to have a more symmetric distribution. This is because many statistical models, including the ones used in this study, assume that the variables are normally distributed. The Yeohjon's transformation can be applied to variables that have skewness or kurtosis, which means that they deviate from a normal distribution. By transforming the variables to be more normally distributed, the statistical models used in the study can be applied more reliably. The transformed variables were as follows;
 
-booster = "gbtree": This parameter specifies that the gradient boosting algorithm should use a decision tree as the base learner.
-
-1. *eta = 0.01*: This is the learning rate, which controls the step size at each iteration of the boosting algorithm. A smaller learning rate generally results in a more accurate model, but requires more iterations to converge.
-
-2. *max_depth = 8*: This parameter sets the maximum depth of the decision trees used in the boosting algorithm. A larger value can result in a more complex model, but may also increase the risk of overfitting.
-
-3. *gamma = 4*: This parameter specifies the minimum reduction in the loss function required to split a leaf node. A larger value can help prevent overfitting by only splitting nodes that lead to a significant improvement in the model.
-
-4. *subsample = 0.75*: This parameter specifies the fraction of the data that should be randomly sampled for each tree in the boosting algorithm. A smaller value can help prevent overfitting by introducing more randomness into the model.
-
-5. *colsample_bytree = 1*: This parameter specifies the fraction of features that should be randomly sampled for each tree in the boosting algorithm. A smaller value can help prevent overfitting by introducing more randomness into the model.
-
-6. *eval_metric = "auc"*: This parameter specifies the evaluation metric to be used during training. In this case, "auc" stands for Area Under the ROC Curve, which is a common metric used for binary classification problems.
-
-7. *objective = "binary:logistic"*: This parameter specifies the loss function to be used during training. In this case, "binary:logistic" indicates that the algorithm should use logistic regression for binary classification.
-
-The following confusion matrix was obtained in predicting the training data;
-
-```{r}
-caret::confusionMatrix(train_data$Direction, xgb_preds_train)
+```{r, fig.width=7}
+caret::featurePlot(x = train.df[,-11],
+            y = train.df$Direction,
+            plot = "density",
+            auto.key = list(columns = 2))
 ```
 
-The XGBoost model attained an accuracy of 1 in predicting the training data. The following confusion matrix was obtained in predicting the test data
+## Model Training
+
+In order to train the predictive model, k-fold cross-validation was employed. The dataset was divided into k ($k = 10$) subsets (or folds) of approximately equal size. The model was then trained on k-1 subsets, and the remaining subset was used as a validation set to evaluate the model's performance. This process was repeated k times, with each subset being used as the validation set once. The results from the k iterations were then averaged to give an estimate of the model's performance on new, unseen data. This method helps to prevent overfitting and provides a more reliable estimate of the model's predictive ability.
+
+### Random Forest
+
+From the 10-fold cross validation training process, the results were as follows;
 
 ```{r}
-caret::confusionMatrix(test_data$Direction, xgb_preds)
+print(rf_model)
 ```
 
-The accuracy on the testing data was also 1. The matrix shows the number of true positives (TP), false positives (FP), false negatives (FN), and true negatives (TN) that resulted from the model's predictions. In this case, the model predicted "Down" 432 times and "Up" 306 times, with no false positives or false negatives.
+From the results, the threshold that gave the highest **Youden's J statistic** ^[Youden's J score is a statistic used in binary classification to measure the performance of a diagnostic test. It takes into account both sensitivity and specificity of the test, and ranges from 0 to 1. A score of 0 indicates that the test has no diagnostic accuracy, while a score of 1 indicates perfect accuracy. A score of 0.5 indicates that the test is no better than chance. ] was chosen. In practice, Youden's J is often used to determine the optimal cutoff point for a binary classifier. The cutoff point is the probability threshold above which the classifier assigns a positive label, and below which it assigns a negative label. The optimal cutoff point is the one that maximizes the Youden's J score, as this corresponds to the point where the true positive rate is maximized relative to the false positive rate. It was as displayed below;
 
-The accuracy of the model is 1.0, meaning it correctly predicted all of the samples. The 95% confidence interval for the accuracy ranges from 0.995 to 1.0, indicating that the model is highly reliable.
+```{r}
+knitr::kable(rf_thresh[max_row, ])
+```
+The Youden's J is usually calculated as $(Sensitiviy  + Specificity) - 1$. For the Random Forest algorithm, the highest J obtained was $0.12841$. A Youden's J score of $0.12841$ indicates that there is a slight imbalance between the true positive rate and the false positive rate of a binary classification model. This means that the model is not very effective at distinguishing between positive and negative cases. The positive class in this case was "Down" level.
 
-The no information rate (NIR) is 0.585, which represents the accuracy that could be achieved by always predicting the most common class. Since the model's accuracy is much higher than the NIR, it shows that the model is performing well.
+In predicting the test data, the results were as follows;
 
-The kappa statistic measures the agreement between the model's predictions and the true labels, with a maximum value of 1.0 indicating perfect agreement. In this case, the kappa statistic is also 1.0, indicating perfect agreement between the predictions and true labels.
+```{r}
+caret::confusionMatrix(test.df$Direction, predicted_rf)
+```
 
-The sensitivity and specificity of the model are both 1.0, meaning it correctly identified all of the positive and negative samples. The positive predictive value (PPV) and negative predictive value (NPV) are also both 1.0, indicating that the model's positive and negative predictions were always correct.
+The accuracy obtained was 58.7%. However, this study was interested in the Youden's J score. For the test data, the model achieved a Youden's J score of $0.138$.
 
-The prevalence of the positive class is 0.585, which is the proportion of samples in the dataset that belong to the positive class. The detection rate and detection prevalence are also both 0.585, indicating that the model correctly identified all of the positive samples.
+### Lasso Regression
 
-Finally, the balanced accuracy of the model is 1.0, which is the average of the sensitivity and specificity. This value takes into account the fact that the classes may be imbalanced, and it indicates that the model is performing well for both classes.
+The results for lasso regression were as follows;
 
+```{r, fig.width=7}
+plot(lasso_model)
+```
 
+The Regularization (l1) parameter which gave the highest accuracy in the cross validation was $\lambda = 0.0040826$. Just as the Random Forest algorithm above, the threshold that gave the highest Youden's J statistic was as follows;
 
+```{r}
+knitr::kable(ls_thresh)
+```
 
+For the lasso model, the highest J obtained was $0.153$. The following results were obtained after predicting the test data;
 
+```{r}
+caret::confusionMatrix(test.df$Direction, predicted_ls)
+```
 
+The model achieved an accuracy of 55.3% and a Youden's J score of 0.143 when predicting the test data. It's worth noting that there was a probability threshold that gave a higher accuracy during cross-validation, but the metric of interest in this case was the Youden's J score. If the probability threshold that yielded the highest accuracy during cross-validation was used, the accuracy would have been 61.7%, as follows:
 
+```{r}
+max_row <- which.max(lasso_thresh$Accuracy)
+ls_thresh <- lasso_thresh[max_row, ] # Which has given us the maximum Youden's J
 
+predicted2 <- predict(lasso_model, as.matrix(test.df[,-11]), type="prob")[,1]
+predicted_ls <- ifelse(predicted2 >= ls_thresh$prob_threshold, "Down", "Up") %>% 
+  as.factor()
+caret::confusionMatrix(test.df$Direction, predicted_ls)
+```
+### Ridge Regression
 
+The results of the Ridge regression was;
 
+```{r, fig.width=7}
+plot(ridge_model)
+```
+The l2 Reguralization parameter which yielded to the highest accuracy was $1 \times 10^-6$. while the probability threshold which yielded to the highest Youden's J score was as follows;
+
+```{r}
+knitr::kable(ridge_thresh[max_row, ])
+```
+
+On predicting the test data, the following results were obtained;
+
+```{r}
+caret::confusionMatrix(test.df$Direction, predicted_ridge)
+```
+
+The model achieved an accuracy of 53.6% and a Youden's J score of 0.156. As a result, among the three models, Ridge regression was selected as the optimal model for predicting the stock return direction based on the Youden's J score. It is important to note that if prediction accuracy had been used as the comparative metric, the results might have been different.
+
+# Conclusion
+
+After conducting a comparative study of ridge regression, random forest, and lasso regression, it was found that ridge regression yielded the highest Youden J statistic, indicating that it has the best balance of sensitivity and specificity for our classification task. It should be noted, however, that if accuracy was used as the sole metric for comparison, the results may have been different. Therefore, the choice of evaluation metric should be carefully considered based on the specific goals and requirements of the task. Overall, I recommend the use of ridge regression for similar classification tasks in the future.
+
+The low accuracy and Youden's J statistic can be attributed to the violation of several assumptions in machine learning algorithms, including:
+
+1. Violation of independence of observations: Stock price data often exhibits serial correlation, meaning that the return on a given day is likely to be related to the returns on previous days. This violates the assumption of independent observations, which many machine learning algorithms rely on.
+
+2. Violation of homoscedasticity: Many machine learning algorithms assume that the variance of the errors is constant across all levels of the predictors. However, stock returns often exhibit heteroscedasticity, meaning that the variance of the returns may change over time, which can lead to biased predictions.
+
+3. Violation of stationarity: Many machine learning algorithms assume that the data is stationary, meaning that the statistical properties of the data do not change over time. However, stock prices are often non-stationary and exhibit trends and other forms of temporal dependence, which can lead to inaccurate predictions if not properly accounted for.
 
 
 
